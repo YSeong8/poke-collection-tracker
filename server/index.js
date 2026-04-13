@@ -32,18 +32,20 @@ app.get("/api/health", (req, res) => {
 
 app.get("/api/pokemon", async (req, res) => {
   try {
-    const response = await axios.get("https://pokeapi.co/api/v2/pokemon?limit=151");
-    const basicList = response.data.results;
+    const response = await axios.get("https://pokeapi.co/api/v2/pokemon?limit=300");
+    const results = response.data.results;
 
     const detailed = await Promise.all(
-      basicList.map(async (pokemon) => {
+      results.map(async (pokemon) => {
         const detailRes = await axios.get(pokemon.url);
+        const data = detailRes.data;
+
         return {
-          id: detailRes.data.id,
-          name: detailRes.data.name,
-          image: detailRes.data.sprites.front_default,
-          types: detailRes.data.types.map((t) => t.type.name),
-          stats: detailRes.data.stats.map((s) => ({
+          id: data.id,
+          name: data.name,
+          image: data.sprites.front_default,
+          types: data.types.map((t) => t.type.name),
+          stats: data.stats.map((s) => ({
             name: s.stat.name,
             value: s.base_stat
           }))
@@ -63,6 +65,14 @@ app.get("/api/pokemon/:id", async (req, res) => {
     const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${req.params.id}`);
     const data = response.data;
 
+    const speciesRes = await axios.get(data.species.url);
+    const speciesData = speciesRes.data;
+
+    const forms = speciesData.varieties.map((v) => ({
+      name: v.pokemon.name,
+      url: v.pokemon.url
+    }));
+
     res.json({
       id: data.id,
       name: data.name,
@@ -73,7 +83,8 @@ app.get("/api/pokemon/:id", async (req, res) => {
       stats: data.stats.map((s) => ({
         name: s.stat.name,
         value: s.base_stat
-      }))
+      })),
+      forms
     });
   } catch (error) {
     console.error("Error fetching Pokémon details:", error.message);
