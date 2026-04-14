@@ -5,6 +5,7 @@ const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
