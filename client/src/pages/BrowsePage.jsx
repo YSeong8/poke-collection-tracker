@@ -8,30 +8,37 @@ export default function BrowsePage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
   const [confettiSprites, setConfettiSprites] = useState([]);
   const [sparkles, setSparkles] = useState([]);
   const [successMessage, setSuccessMessage] = useState("");
 
-  const email = localStorage.getItem("pokedexUserEmail");
-
   useEffect(() => {
-    if (!email) {
-      setLoading(false);
-      return;
-    }
+    const loadPage = async () => {
+      try {
+        const sessionRes = await API.get("/session");
 
-    API.get("/pokemon")
-      .then((res) => {
-        setPokemon(res.data);
-      })
-      .catch((err) => {
+        if (!sessionRes.data.loggedIn) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        setUser(sessionRes.data.user);
+
+        const pokemonRes = await API.get("/pokemon");
+        setPokemon(pokemonRes.data);
+      } catch (err) {
         console.error(err);
+        setUser(null);
         setPokemon([]);
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
-  }, [email]);
+      }
+    };
+
+    loadPage();
+  }, []);
 
   const triggerPokemonCelebration = (imageUrl, name) => {
     const spritePieces = Array.from({ length: 36 }, (_, i) => {
@@ -82,7 +89,7 @@ export default function BrowsePage() {
   };
 
   const handleCatch = async (p) => {
-    if (!email) {
+    if (!user) {
       setSuccessMessage("Please log in first.");
       setTimeout(() => setSuccessMessage(""), 1800);
       return;
@@ -90,7 +97,6 @@ export default function BrowsePage() {
 
     try {
       await API.post("/collection", {
-        email,
         pokemonId: p.id,
         name: p.name,
         image: p.image,
@@ -116,7 +122,7 @@ export default function BrowsePage() {
 
   const uniqueTypes = [...new Set(pokemon.flatMap((p) => p.types || []))].sort();
 
-  if (!email) {
+  if (!loading && !user) {
     return (
       <div style={styles.page}>
         <div style={styles.panel}>
@@ -136,7 +142,9 @@ export default function BrowsePage() {
     <div style={styles.page}>
       <div style={styles.panel}>
         <h2 style={styles.title}>Browse Pokémon</h2>
-        <p style={styles.subtitle}>Logged in as: {email}</p>
+        <p style={styles.subtitle}>
+          Logged in as: {user ? user.email : "Loading..."}
+        </p>
 
         <div style={styles.controls}>
           <input
@@ -183,11 +191,7 @@ export default function BrowsePage() {
         )}
       </div>
 
-      {successMessage && (
-        <div style={styles.banner}>
-          {successMessage}
-        </div>
-      )}
+      {successMessage && <div style={styles.banner}>{successMessage}</div>}
 
       {confettiSprites.map((piece) => (
         <img
@@ -285,7 +289,7 @@ export default function BrowsePage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #d62828 0%, #f77f00 100%)",
+    background: "linear-gradient(180deg, #1d3557 0%, #457b9d 100%)",
     padding: "24px"
   },
   panel: {

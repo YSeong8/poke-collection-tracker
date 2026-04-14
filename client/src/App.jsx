@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import BrowsePage from "./pages/BrowsePage";
 import DetailsPage from "./pages/DetailsPage";
 import CollectionPage from "./pages/CollectionPage";
+import ComparePage from "./pages/ComparePage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/pokemon/:id" element={<DetailsPage />} />
         <Route path="/collection" element={<CollectionPage />} />
+        <Route path="/compare" element={<ComparePage />} />
       </Routes>
     </BrowserRouter>
   );

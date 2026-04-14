@@ -1,13 +1,36 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import pokemonLogo from "../assets/pokemon-logo.png";
+import API from "../api";
 
 export default function Navbar() {
   const navigate = useNavigate();
-  const email = localStorage.getItem("pokedexUserEmail");
+  const location = useLocation();
+  const [user, setUser] = useState(null);
 
-  const handleLogout = () => {
-    localStorage.removeItem("pokedexUserEmail");
-    navigate("/login");
+  useEffect(() => {
+    API.get("/session")
+      .then((res) => {
+        if (res.data.loggedIn) {
+          setUser(res.data.user);
+        } else {
+          setUser(null);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setUser(null);
+      });
+  }, [location.pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await API.post("/logout");
+      setUser(null);
+      navigate("/login");
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -21,14 +44,14 @@ export default function Navbar() {
         <Link to="/" style={styles.link}>Home</Link>
         <Link to="/browse" style={styles.link}>Browse</Link>
         <Link to="/collection" style={styles.link}>My Collection</Link>
-
+        <Link to="/compare" style={styles.link}>Compare</Link>
         <Link to="/login" style={styles.link}>
-          {email ? "Switch Account" : "Login"}
+          {user ? "Switch Account" : "Login"}
         </Link>
 
-        {email && <span style={styles.email}>{email}</span>}
+        {user && <span style={styles.email}>{user.email}</span>}
 
-        {email && (
+        {user && (
           <button onClick={handleLogout} style={styles.logoutButton}>
             Logout
           </button>

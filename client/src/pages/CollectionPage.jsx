@@ -28,27 +28,47 @@ export default function CollectionPage() {
   const [editingId, setEditingId] = useState(null);
   const [editRating, setEditRating] = useState(0);
   const [editNotes, setEditNotes] = useState("");
-
-  const email = localStorage.getItem("pokedexUserEmail");
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const loadCollection = async () => {
-    if (!email) return;
-
     try {
-      const res = await API.get(`/collection?email=${encodeURIComponent(email)}`);
+      const res = await API.get("/collection");
       setCollection(res.data);
     } catch (error) {
       console.error(error);
+      setCollection([]);
     }
   };
 
   useEffect(() => {
-    loadCollection();
-  }, [email]);
+    const loadPage = async () => {
+      try {
+        const sessionRes = await API.get("/session");
+
+        if (!sessionRes.data.loggedIn) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        setUser(sessionRes.data.user);
+        await loadCollection();
+      } catch (error) {
+        console.error(error);
+        setUser(null);
+        setCollection([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPage();
+  }, []);
 
   const handleDelete = async (pokemonId) => {
     try {
-      await API.delete(`/collection/${pokemonId}?email=${encodeURIComponent(email)}`);
+      await API.delete(`/collection/${pokemonId}`);
       loadCollection();
     } catch (error) {
       console.error(error);
@@ -64,7 +84,6 @@ export default function CollectionPage() {
   const saveEdit = async (pokemonId) => {
     try {
       await API.put(`/collection/${pokemonId}`, {
-        email,
         rating: editRating,
         notes: editNotes,
         caught: true
@@ -78,7 +97,7 @@ export default function CollectionPage() {
     }
   };
 
-  if (!email) {
+  if (!loading && !user) {
     return (
       <div style={styles.page}>
         <div style={styles.panel}>
@@ -99,13 +118,15 @@ export default function CollectionPage() {
       <div style={styles.panel}>
         <h2 style={styles.title}>My Collection</h2>
         <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
-          Logged in as: {email}
+          Logged in as: {user ? user.email : "Loading..."}
         </p>
         <p style={{ marginBottom: "20px", fontWeight: "bold" }}>
           Caught {collection.length} / 151 Pokémon
         </p>
 
-        {collection.length === 0 ? (
+        {loading ? (
+          <p>Loading collection...</p>
+        ) : collection.length === 0 ? (
           <div style={styles.emptyState}>
             <p style={styles.emptyTitle}>No Pokémon caught yet.</p>
             <p style={{ marginBottom: "16px" }}>

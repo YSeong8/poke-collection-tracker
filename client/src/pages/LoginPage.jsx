@@ -1,52 +1,128 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../api";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const currentEmail = localStorage.getItem("pokedexUserEmail") || "";
-  const [email, setEmail] = useState(currentEmail);
-  const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    API.get("/session")
+      .then((res) => {
+        if (res.data.loggedIn) {
+          setCurrentUser(res.data.user);
+          setEmail(res.data.user.email);
+        } else {
+          setCurrentUser(null);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
 
     const trimmedEmail = email.trim().toLowerCase();
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!trimmedEmail) {
       setError("Please enter an email.");
       return;
     }
 
-    if (!emailPattern.test(trimmedEmail)) {
-      setError("Please enter a valid email address.");
+    if (!password) {
+      setError("Please enter a password.");
       return;
     }
 
-    setError("");
-    localStorage.setItem("pokedexUserEmail", trimmedEmail);
-    navigate("/");
+    if (mode === "register") {
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
+
+    try {
+      setLoading(true);
+
+      const endpoint = mode === "register" ? "/register" : "/login";
+
+      await API.post(endpoint, {
+        email: trimmedEmail,
+        password
+      });
+
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.error || "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.title}>
-          {currentEmail ? "Login / Switch Account" : "Login"}
+          {mode === "register" ? "Create Account" : "Login"}
         </h1>
 
         <p style={styles.text}>
-          Enter your email to access your personal Pokédex collection.
-          If this email has not been used before, a new collection will be created automatically.
+          Create a secure account with your email and password, or log in to access your private Pokédex collection.
         </p>
 
-        {currentEmail && (
+        {currentUser && (
           <p style={styles.currentUser}>
-            Currently logged in as: {currentEmail}
+            Currently logged in as: {currentUser.email}
           </p>
         )}
 
-        <form onSubmit={handleLogin} style={styles.form}>
+        <div style={styles.switchRow}>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setError("");
+            }}
+            style={{
+              ...styles.switchButton,
+              ...(mode === "login" ? styles.activeSwitch : {})
+            }}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("register");
+              setError("");
+            }}
+            style={{
+              ...styles.switchButton,
+              ...(mode === "register" ? styles.activeSwitch : {})
+            }}
+          >
+            Register
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={styles.form}>
           <input
             type="email"
             placeholder="Enter your email"
@@ -56,10 +132,45 @@ export default function LoginPage() {
             required
           />
 
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder={mode === "register" ? "Create a password" : "Enter your password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={styles.input}
+            required
+          />
+
+          {mode === "register" && (
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={styles.input}
+              required
+            />
+          )}
+
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={showPassword}
+              onChange={(e) => setShowPassword(e.target.checked)}
+            />
+            Show password
+          </label>
+
           {error && <p style={styles.error}>{error}</p>}
 
-          <button type="submit" style={styles.button}>
-            {currentEmail ? "Continue / Switch Account" : "Continue"}
+          <button type="submit" style={styles.button} disabled={loading}>
+            {loading
+              ? mode === "register"
+                ? "Creating account..."
+                : "Logging in..."
+              : mode === "register"
+                ? "Create Account"
+                : "Login"}
           </button>
         </form>
       </div>
@@ -70,7 +181,7 @@ export default function LoginPage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #ffcb05 0%, #e3350d 100%)",
+    background: "linear-gradient(180deg, #1d3557 0%, #457b9d 100%)",
     padding: "24px",
     display: "flex",
     justifyContent: "center",
@@ -98,9 +209,28 @@ const styles = {
     fontSize: "1rem"
   },
   currentUser: {
-    marginBottom: "20px",
+    marginBottom: "18px",
     fontWeight: "bold",
     color: "#444"
+  },
+  switchRow: {
+    display: "flex",
+    gap: "10px",
+    justifyContent: "center",
+    marginBottom: "18px"
+  },
+  switchButton: {
+    background: "#d9d9d9",
+    color: "#1d3557",
+    border: "none",
+    borderRadius: "10px",
+    padding: "10px 14px",
+    fontWeight: "bold",
+    cursor: "pointer"
+  },
+  activeSwitch: {
+    background: "#2a75bb",
+    color: "white"
   },
   form: {
     display: "flex",
@@ -109,6 +239,14 @@ const styles = {
   },
   input: {
     width: "100%"
+  },
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    justifyContent: "flex-start",
+    fontWeight: "bold",
+    color: "#444"
   },
   error: {
     margin: 0,

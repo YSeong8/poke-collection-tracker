@@ -31,22 +31,25 @@ export default function DetailsPage() {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const email = localStorage.getItem("pokedexUserEmail");
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const loadPokemon = async () => {
       try {
         setError("");
 
+        const sessionRes = await API.get("/session");
+        if (sessionRes.data.loggedIn) {
+          setUser(sessionRes.data.user);
+        } else {
+          setUser(null);
+        }
+
         const pokemonRes = await API.get(`/pokemon/${id}`);
         setPokemon(pokemonRes.data);
 
-        if (email) {
-          const collectionRes = await API.get(
-            `/collection?email=${encodeURIComponent(email)}`
-          );
-
+        if (sessionRes.data.loggedIn) {
+          const collectionRes = await API.get("/collection");
           const existing = collectionRes.data.find(
             (item) => Number(item.pokemonId) === Number(id)
           );
@@ -69,10 +72,10 @@ export default function DetailsPage() {
     };
 
     loadPokemon();
-  }, [id, email]);
+  }, [id]);
 
   const saveToCollection = async () => {
-    if (!email) {
+    if (!user) {
       alert("Please log in first.");
       return;
     }
@@ -81,7 +84,6 @@ export default function DetailsPage() {
       setSaving(true);
 
       await API.post("/collection", {
-        email,
         pokemonId: pokemon.id,
         name: pokemon.name,
         image: pokemon.image,
@@ -145,9 +147,15 @@ export default function DetailsPage() {
           </div>
         </div>
 
-        {!email && (
+        {!user && (
           <p style={styles.loginNotice}>
-            Please log in to save this Pokémon to a personal collection.
+            Please log in to save this Pokémon to your personal collection.
+          </p>
+        )}
+
+        {user && (
+          <p style={styles.userNotice}>
+            Logged in as: {user.email}
           </p>
         )}
 
@@ -306,5 +314,12 @@ const styles = {
     padding: "12px",
     borderRadius: "8px",
     marginBottom: "18px"
+  },
+  userNotice: {
+    background: "#d9edf7",
+    padding: "12px",
+    borderRadius: "8px",
+    marginBottom: "18px",
+    fontWeight: "bold"
   }
 };
