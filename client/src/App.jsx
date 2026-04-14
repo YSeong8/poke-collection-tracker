@@ -9,7 +9,7 @@ import CollectionPage from "./pages/CollectionPage";
 export default function App() {
   return (
     <BrowserRouter>
-      <Navbar />
+      <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
