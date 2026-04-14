@@ -16,8 +16,7 @@ export default function BrowsePage() {
     const loadPage = async () => {
       try {
         const pokemonRes = await API.get("/pokemon");
-        console.log("pokemon response:", pokemonRes.data);
-        setPokemon(Array.isArray(pokemonRes.data) ? pokemonRes.data : []);
+        setPokemon(pokemonRes.data);
       } catch (err) {
         console.error("Failed to load pokemon:", err);
         setPokemon([]);
@@ -148,11 +147,8 @@ export default function BrowsePage() {
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             style={styles.select}
-            disabled={pokemon.length === 0}
           >
-            <option value="">
-              {pokemon.length === 0 ? "No types available" : "All Types"}
-            </option>
+            <option value="">All Types</option>
             {uniqueTypes.map((type) => (
               <option key={type} value={type}>
                 {type}
@@ -163,14 +159,7 @@ export default function BrowsePage() {
 
         <p style={styles.resultsText}>Showing {filtered.length} Pokémon</p>
 
-        {pokemon.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p style={styles.emptyTitle}>No Pokémon loaded.</p>
-            <p style={{ marginBottom: 0 }}>
-              The Pokémon list could not be loaded right now. Try refreshing the page.
-            </p>
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div style={styles.emptyState}>
             <p style={styles.emptyTitle}>No Pokémon matched your search.</p>
             <p style={{ marginBottom: 0 }}>
