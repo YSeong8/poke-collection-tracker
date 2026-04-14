@@ -121,17 +121,7 @@ export default function BrowsePage() {
 
   if (!loading && !user) {
     return (
-      <div style={styles.page}>
-        <div style={styles.panel}>
-          <h2 style={styles.title}>Browse Pokémon</h2>
-          <p style={{ marginBottom: "16px" }}>
-            Please log in to browse and catch Pokémon.
-          </p>
-          <Link to="/login">
-            <button>Go to Login</button>
-          </Link>
-        </div>
-      </div>
+      // login-only screen
     );
   }
 
