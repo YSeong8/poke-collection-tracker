@@ -17,15 +17,12 @@ export default function BrowsePage() {
     const loadPage = async () => {
       try {
         const sessionRes = await API.get("/session");
-
-        if (!sessionRes.data.loggedIn) {
+        if (sessionRes.data.loggedIn) {
+          setUser(sessionRes.data.user);
+        } else {
           setUser(null);
-          setLoading(false);
-          return;
         }
-
-        setUser(sessionRes.data.user);
-
+  
         const pokemonRes = await API.get("/pokemon");
         setPokemon(pokemonRes.data);
       } catch (err) {
@@ -36,7 +33,7 @@ export default function BrowsePage() {
         setLoading(false);
       }
     };
-
+  
     loadPage();
   }, []);
 
