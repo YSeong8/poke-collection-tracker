@@ -17,8 +17,7 @@ export default function BrowsePage() {
       try {
         const pokemonRes = await API.get("/pokemon");
         console.log("pokemon response:", pokemonRes.data);
-        setPokemon(pokemonRes.data);
-        console.log("loaded pokemon count:", pokemonRes.data.length);
+        setPokemon(Array.isArray(pokemonRes.data) ? pokemonRes.data : []);
       } catch (err) {
         console.error("Failed to load pokemon:", err);
         setPokemon([]);
@@ -164,27 +163,28 @@ export default function BrowsePage() {
 
         <p style={styles.resultsText}>Showing {filtered.length} Pokémon</p>
 
-          {pokemon.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p style={styles.emptyTitle}>No Pokémon loaded.</p>
-              <p style={{ marginBottom: 0 }}>
-                The Pokémon list could not be loaded right now. Try refreshing the page.
-              </p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p style={styles.emptyTitle}>No Pokémon matched your search.</p>
-              <p style={{ marginBottom: 0 }}>
-                Try a different name or clear the type filter.
-              </p>
-            </div>
-          ) : (
-            <div style={styles.grid}>
-              {filtered.map((p) => (
-                <PokemonCard key={p.id} pokemon={p} onCatch={handleCatch} />
-              ))}
-            </div>
-          )}
+        {pokemon.length === 0 ? (
+          <div style={styles.emptyState}>
+            <p style={styles.emptyTitle}>No Pokémon loaded.</p>
+            <p style={{ marginBottom: 0 }}>
+              The Pokémon list could not be loaded right now. Try refreshing the page.
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={styles.emptyState}>
+            <p style={styles.emptyTitle}>No Pokémon matched your search.</p>
+            <p style={{ marginBottom: 0 }}>
+              Try a different name or clear the type filter.
+            </p>
+          </div>
+        ) : (
+          <div style={styles.grid}>
+            {filtered.map((p) => (
+              <PokemonCard key={p.id} pokemon={p} onCatch={handleCatch} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {successMessage && <div style={styles.banner}>{successMessage}</div>}
 
