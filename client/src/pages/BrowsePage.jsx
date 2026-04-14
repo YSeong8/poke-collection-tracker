@@ -119,10 +119,8 @@ export default function BrowsePage() {
 
   const uniqueTypes = [...new Set(pokemon.flatMap((p) => p.types || []))].sort();
 
-  if (!loading && !user) {
-    return (
-      // login-only screen
-    );
+  if (loading) {
+    return <p>Loading...</p>;
   }
 
   return (
