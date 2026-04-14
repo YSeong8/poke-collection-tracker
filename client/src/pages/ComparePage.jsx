@@ -4,6 +4,7 @@ import API from "../api";
 
 export default function ComparePage() {
   const [user, setUser] = useState(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [shareCode, setShareCode] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -13,39 +14,49 @@ export default function ComparePage() {
   const [nicknameInput, setNicknameInput] = useState("");
 
   useEffect(() => {
-    API.get("/session")
-      .then((res) => {
+    const loadPage = async () => {
+      try {
+        const res = await API.get("/session");
         if (res.data.loggedIn) {
           setUser(res.data.user);
         } else {
           setUser(null);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
         setUser(null);
-      });
+      } finally {
+        setSessionChecked(true);
+      }
 
-    const stored = localStorage.getItem("savedCompareCodes");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
+      const stored = localStorage.getItem("savedCompareCodes");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
 
-        if (Array.isArray(parsed)) {
-          // Backward compatibility with old string-only saved codes
-          const normalized = parsed.map((item) =>
-            typeof item === "string"
-              ? { code: item, nickname: "" }
-              : { code: item.code, nickname: item.nickname || "" }
-          );
-          setSavedCodes(normalized);
-        } else {
+          if (Array.isArray(parsed)) {
+            const normalized = parsed
+              .map((item) =>
+                typeof item === "string"
+                  ? { code: item, nickname: "" }
+                  : {
+                      code: (item.code || "").trim().toUpperCase(),
+                      nickname: item.nickname || ""
+                    }
+              )
+              .filter((item) => item.code);
+
+            setSavedCodes(normalized);
+          } else {
+            setSavedCodes([]);
+          }
+        } catch {
           setSavedCodes([]);
         }
-      } catch {
-        setSavedCodes([]);
       }
-    }
+    };
+
+    loadPage();
   }, []);
 
   const persistCodes = (codes) => {
@@ -78,6 +89,11 @@ export default function ComparePage() {
     setNicknameInput(item.nickname || "");
   };
 
+  const cancelNicknameEdit = () => {
+    setEditingCode(null);
+    setNicknameInput("");
+  };
+
   const saveNickname = (code) => {
     const updated = savedCodes.map((item) =>
       item.code === code
@@ -95,6 +111,7 @@ export default function ComparePage() {
 
     if (!trimmed) {
       setError("Please enter a share code.");
+      setResult(null);
       return;
     }
 
@@ -109,6 +126,7 @@ export default function ComparePage() {
       saveCode(trimmed);
     } catch (err) {
       console.error(err);
+      setResult(null);
       setError(err.response?.data?.error || "Failed to compare collections.");
     } finally {
       setLoading(false);
@@ -120,6 +138,17 @@ export default function ComparePage() {
     runCompare(shareCode);
   };
 
+  if (!sessionChecked) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.panel}>
+          <h2 style={styles.title}>Compare Collections</h2>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div style={styles.page}>
@@ -129,7 +158,9 @@ export default function ComparePage() {
             Please log in to compare your collection with another user.
           </p>
           <Link to="/login">
-            <button>Go to Login</button>
+            <button type="button" style={styles.loginButton}>
+              Go to Login
+            </button>
           </Link>
         </div>
       </div>
@@ -150,7 +181,7 @@ export default function ComparePage() {
             onChange={(e) => setShareCode(e.target.value.toUpperCase())}
             style={styles.input}
           />
-          <button type="submit" disabled={loading}>
+          <button type="submit" disabled={loading} style={styles.primaryButton}>
             {loading ? "Comparing..." : "Compare"}
           </button>
         </form>
@@ -163,6 +194,7 @@ export default function ComparePage() {
                 <div key={item.code} style={styles.savedCodeCard}>
                   <div style={styles.savedCodeInfo}>
                     <button
+                      type="button"
                       onClick={() => runCompare(item.code)}
                       style={styles.savedCodeButton}
                     >
@@ -181,16 +213,15 @@ export default function ComparePage() {
                           style={styles.nicknameInput}
                         />
                         <button
+                          type="button"
                           onClick={() => saveNickname(item.code)}
                           style={styles.smallButton}
                         >
                           Save Nickname
                         </button>
                         <button
-                          onClick={() => {
-                            setEditingCode(null);
-                            setNicknameInput("");
-                          }}
+                          type="button"
+                          onClick={cancelNicknameEdit}
                           style={styles.smallButtonSecondary}
                         >
                           Cancel
@@ -199,12 +230,14 @@ export default function ComparePage() {
                     ) : (
                       <div style={styles.savedActions}>
                         <button
+                          type="button"
                           onClick={() => startNicknameEdit(item)}
                           style={styles.smallButton}
                         >
                           {item.nickname ? "Edit Nickname" : "Add Nickname"}
                         </button>
                         <button
+                          type="button"
                           onClick={() => removeCode(item.code)}
                           style={styles.removeButton}
                         >
@@ -239,7 +272,7 @@ export default function ComparePage() {
               ) : (
                 <ul style={styles.list}>
                   {result.shared.map((p) => (
-                    <li key={p.pokemonId} style={{ textTransform: "capitalize" }}>
+                    <li key={p.pokemonId} style={styles.capitalize}>
                       {p.name}
                     </li>
                   ))}
@@ -254,7 +287,7 @@ export default function ComparePage() {
               ) : (
                 <ul style={styles.list}>
                   {result.onlyMine.map((p) => (
-                    <li key={p.pokemonId} style={{ textTransform: "capitalize" }}>
+                    <li key={p.pokemonId} style={styles.capitalize}>
                       {p.name}
                     </li>
                   ))}
@@ -269,7 +302,7 @@ export default function ComparePage() {
               ) : (
                 <ul style={styles.list}>
                   {result.onlyTheirs.map((p) => (
-                    <li key={p.pokemonId} style={{ textTransform: "capitalize" }}>
+                    <li key={p.pokemonId} style={styles.capitalize}>
                       {p.name}
                     </li>
                   ))}
@@ -316,6 +349,24 @@ const styles = {
   input: {
     minWidth: "280px",
     flex: 1
+  },
+  primaryButton: {
+    background: "#2a75bb",
+    color: "white",
+    border: "none",
+    borderRadius: "10px",
+    padding: "10px 14px",
+    fontWeight: "bold",
+    cursor: "pointer"
+  },
+  loginButton: {
+    background: "#2a75bb",
+    color: "white",
+    border: "none",
+    borderRadius: "10px",
+    padding: "10px 14px",
+    fontWeight: "bold",
+    cursor: "pointer"
   },
   savedSection: {
     background: "white",
@@ -417,5 +468,8 @@ const styles = {
   },
   list: {
     marginBottom: 0
+  },
+  capitalize: {
+    textTransform: "capitalize"
   }
 };
