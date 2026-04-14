@@ -15,13 +15,15 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS collection (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemonId INTEGER UNIQUE,
+      email TEXT NOT NULL,
+      pokemonId INTEGER NOT NULL,
       name TEXT NOT NULL,
       image TEXT,
       types TEXT,
       rating INTEGER DEFAULT 0,
       notes TEXT DEFAULT '',
-      caught INTEGER DEFAULT 1
+      caught INTEGER DEFAULT 1,
+      UNIQUE(email, pokemonId)
     )
   `);
 });
@@ -32,10 +34,10 @@ app.get("/api/health", (req, res) => {
 
 app.get("/api/pokemon", async (req, res) => {
   try {
-    const response = await axios.get("https://pokeapi.co/api/v2/pokemon?limit=300");
+    const response = await axios.get("https://pokeapi.co/api/v2/pokemon?limit=151");
     const results = response.data.results;
 
-    const detailed = await Promise.all(
+    const basicPokemon = await Promise.all(
       results.map(async (pokemon) => {
         const detailRes = await axios.get(pokemon.url);
         const data = detailRes.data;
@@ -44,18 +46,14 @@ app.get("/api/pokemon", async (req, res) => {
           id: data.id,
           name: data.name,
           image: data.sprites.front_default,
-          types: data.types.map((t) => t.type.name),
-          stats: data.stats.map((s) => ({
-            name: s.stat.name,
-            value: s.base_stat
-          }))
+          types: data.types.map((t) => t.type.name)
         };
       })
     );
 
-    res.json(detailed);
+    res.json(basicPokemon);
   } catch (error) {
-    console.error("Error fetching pokemon:", error.message);
+    console.error("Error fetching pokemon list:", error.message);
     res.status(500).json({ error: "Failed to fetch Pokémon" });
   }
 });
@@ -65,13 +63,20 @@ app.get("/api/pokemon/:id", async (req, res) => {
     const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${req.params.id}`);
     const data = response.data;
 
-    const speciesRes = await axios.get(data.species.url);
-    const speciesData = speciesRes.data;
+    let forms = [];
+    try {
+      const speciesRes = await axios.get(data.species.url);
+      const speciesData = speciesRes.data;
 
-    const forms = speciesData.varieties.map((v) => ({
-      name: v.pokemon.name,
-      url: v.pokemon.url
-    }));
+      if (Array.isArray(speciesData.varieties)) {
+        forms = speciesData.varieties.map((v) => ({
+          name: v.pokemon.name,
+          url: v.pokemon.url
+        }));
+      }
+    } catch (speciesError) {
+      console.error("Species lookup failed:", speciesError.message);
+    }
 
     res.json({
       id: data.id,
@@ -93,77 +98,122 @@ app.get("/api/pokemon/:id", async (req, res) => {
 });
 
 app.get("/api/collection", (req, res) => {
-  db.all("SELECT * FROM collection ORDER BY pokemonId ASC", [], (err, rows) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).json({ error: "Failed to load collection" });
+  const email = (req.query.email || "").trim().toLowerCase();
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  db.all(
+    "SELECT * FROM collection WHERE email = ? ORDER BY pokemonId ASC",
+    [email],
+    (err, rows) => {
+      if (err) {
+        console.error("Collection load error:", err.message);
+        return res.status(500).json({ error: "Failed to load collection" });
+      }
+      res.json(rows);
     }
-    res.json(rows);
-  });
+  );
 });
 
 app.post("/api/collection", (req, res) => {
-  const { pokemonId, name, image, types, rating, notes, caught } = req.body;
+  console.log("POST /api/collection body:", req.body);
+
+  const { email, pokemonId, name, image, types, rating, notes, caught } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  if (!pokemonId || !name) {
+    return res.status(400).json({ error: "pokemonId and name are required" });
+  }
+
+  const safeEmail = String(email).trim().toLowerCase();
+  const safeTypes = Array.isArray(types) ? JSON.stringify(types) : "[]";
 
   const sql = `
-    INSERT INTO collection (pokemonId, name, image, types, rating, notes, caught)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(pokemonId) DO UPDATE SET
-      name=excluded.name,
-      image=excluded.image,
-      types=excluded.types,
-      rating=excluded.rating,
-      notes=excluded.notes,
-      caught=excluded.caught
+    INSERT INTO collection (email, pokemonId, name, image, types, rating, notes, caught)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(email, pokemonId) DO UPDATE SET
+      name = excluded.name,
+      image = excluded.image,
+      types = excluded.types,
+      rating = excluded.rating,
+      notes = excluded.notes,
+      caught = excluded.caught
   `;
 
   db.run(
     sql,
     [
+      safeEmail,
       pokemonId,
       name,
-      image,
-      JSON.stringify(types || []),
-      rating || 0,
+      image || "",
+      safeTypes,
+      Number(rating) || 0,
       notes || "",
       caught ? 1 : 0
     ],
     function (err) {
       if (err) {
-        console.error(err.message);
+        console.error("Save error:", err.message);
         return res.status(500).json({ error: "Failed to save Pokémon" });
       }
-      res.json({ success: true });
+
+      res.json({ success: true, changes: this.changes });
     }
   );
 });
 
 app.put("/api/collection/:pokemonId", (req, res) => {
-  const { rating, notes, caught } = req.body;
+  const { email, rating, notes, caught } = req.body;
 
-  const sql = `
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  const safeEmail = String(email).trim().toLowerCase();
+
+  db.run(
+    `
     UPDATE collection
     SET rating = ?, notes = ?, caught = ?
-    WHERE pokemonId = ?
-  `;
+    WHERE email = ? AND pokemonId = ?
+    `,
+    [Number(rating) || 0, notes || "", caught ? 1 : 0, safeEmail, req.params.pokemonId],
+    function (err) {
+      if (err) {
+        console.error("Update error:", err.message);
+        return res.status(500).json({ error: "Failed to update Pokémon" });
+      }
 
-  db.run(sql, [rating || 0, notes || "", caught ? 1 : 0, req.params.pokemonId], function (err) {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).json({ error: "Failed to update Pokémon" });
+      res.json({ success: true, changes: this.changes });
     }
-    res.json({ success: true, changes: this.changes });
-  });
+  );
 });
 
 app.delete("/api/collection/:pokemonId", (req, res) => {
-  db.run("DELETE FROM collection WHERE pokemonId = ?", [req.params.pokemonId], function (err) {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).json({ error: "Failed to delete Pokémon" });
+  const email = (req.query.email || "").trim().toLowerCase();
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  db.run(
+    "DELETE FROM collection WHERE email = ? AND pokemonId = ?",
+    [email, req.params.pokemonId],
+    function (err) {
+      if (err) {
+        console.error("Delete error:", err.message);
+        return res.status(500).json({ error: "Failed to delete Pokémon" });
+      }
+
+      res.json({ success: true, changes: this.changes });
     }
-    res.json({ success: true, changes: this.changes });
-  });
+  );
 });
 
 app.listen(PORT, () => {
