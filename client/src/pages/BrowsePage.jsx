@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import API from "../api";
 import PokemonCard from "../components/PokemonCard";
 
@@ -16,24 +15,28 @@ export default function BrowsePage() {
   useEffect(() => {
     const loadPage = async () => {
       try {
+        const pokemonRes = await API.get("/pokemon");
+        setPokemon(pokemonRes.data);
+      } catch (err) {
+        console.error("Failed to load pokemon:", err);
+        setPokemon([]);
+      }
+
+      try {
         const sessionRes = await API.get("/session");
         if (sessionRes.data.loggedIn) {
           setUser(sessionRes.data.user);
         } else {
           setUser(null);
         }
-  
-        const pokemonRes = await API.get("/pokemon");
-        setPokemon(pokemonRes.data);
       } catch (err) {
-        console.error(err);
+        console.error("Session check failed:", err);
         setUser(null);
-        setPokemon([]);
       } finally {
         setLoading(false);
       }
     };
-  
+
     loadPage();
   }, []);
 
@@ -87,8 +90,8 @@ export default function BrowsePage() {
 
   const handleCatch = async (p) => {
     if (!user) {
-      setSuccessMessage("Please log in first.");
-      setTimeout(() => setSuccessMessage(""), 1800);
+      setSuccessMessage("Please log in to add Pokémon to your collection.");
+      setTimeout(() => setSuccessMessage(""), 2200);
       return;
     }
 
@@ -120,7 +123,7 @@ export default function BrowsePage() {
   const uniqueTypes = [...new Set(pokemon.flatMap((p) => p.types || []))].sort();
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <p style={{ padding: "24px" }}>Loading...</p>;
   }
 
   return (
@@ -128,7 +131,7 @@ export default function BrowsePage() {
       <div style={styles.panel}>
         <h2 style={styles.title}>Browse Pokémon</h2>
         <p style={styles.subtitle}>
-          Logged in as: {user ? user.email : "Loading..."}
+          {user ? `Logged in as: ${user.email}` : "Browsing as guest"}
         </p>
 
         <div style={styles.controls}>
@@ -154,13 +157,9 @@ export default function BrowsePage() {
           </select>
         </div>
 
-        <p style={styles.resultsText}>
-          Showing {filtered.length} Pokémon
-        </p>
+        <p style={styles.resultsText}>Showing {filtered.length} Pokémon</p>
 
-        {loading ? (
-          <p>Loading Pokémon...</p>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div style={styles.emptyState}>
             <p style={styles.emptyTitle}>No Pokémon matched your search.</p>
             <p style={{ marginBottom: 0 }}>
